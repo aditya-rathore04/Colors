@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Palette Forge — perceptual color ramp generator</title>
+<style>
+  :root {
+    --bg: #F4F1EC;
+    --bg-card: #FFFFFF;
+    --border: #E2DFD6;
+    --border-strong: #C9C5B8;
+    --text-primary: #26251F;
+    --text-secondary: #6B695E;
+    --text-tertiary: #9A978A;
+    --accent: #484A36;
+    --accent-hover: #5C5E47;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --mono: 'SF Mono', 'Roboto Mono', Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1C1B17;
+      --bg-card: #26251F;
+      --border: #3A3830;
+      --border-strong: #4D4A40;
+      --text-primary: #F1EFE8;
+      --text-secondary: #B0AD9F;
+      --text-tertiary: #7D7A6D;
+      --accent: #A8AC8C;
+      --accent-hover: #C0C3A8;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+
+  header {
+    margin-bottom: 28px;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  /* ---- Input panel ---- */
+  .input-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 28px;
+  }
+
+  .input-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .color-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    padding: 6px 10px 6px 6px;
+    background: var(--bg);
+    position: relative;
+  }
+
+  .color-chip input[type="color"] {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    padding: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .color-chip input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  .color-chip input[type="color"]::-webkit-color-swatch { border: 1px solid var(--border-strong); border-radius: 6px; }
+
+  .color-chip input[type="text"] {
+    width: 84px;
+    border: none;
+    background: none;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-primary);
+    outline: none;
+  }
+
+  .color-chip .role-label {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-right: 2px;
+  }
+
+  .color-chip .remove-btn {
+    border: none;
+    background: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+  .color-chip .remove-btn:hover { background: var(--border); color: var(--text-primary); }
+
+  .add-color-btn {
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-md);
+    padding: 7px 14px;
+    background: none;
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    font-family: var(--sans);
+  }
+  .add-color-btn:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+
+  .controls-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .options {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .options label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+  .generate-btn {
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    border-radius: var(--radius-md);
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: var(--sans);
+  }
+  .generate-btn:hover { background: var(--accent-hover); }
+
+  /* ---- Output ---- */
+  .section { margin-bottom: 30px; }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0 0 3px;
+  }
+
+  .section-sub {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0 0 12px;
+    line-height: 1.5;
+  }
+
+  .ramp {
+    display: flex;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .swatch {
+    flex: 1;
+    min-height: 64px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 6px 8px;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.1s;
+  }
+  .swatch:hover { transform: scale(1.03); z-index: 2; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+
+  .swatch .step { font-size: 10px; font-weight: 600; opacity: 0.85; font-family: var(--mono); }
+  .swatch .hex { font-size: 9px; font-family: var(--mono); opacity: 0.75; }
+
+  .swatch.copied::after {
+    content: 'copied';
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  /* ---- Token table ---- */
+  .token-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .token-table th {
+    text-align: left;
+    padding: 8px 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .token-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .token-table tr:last-child td { border-bottom: none; }
+  .token-table code { font-family: var(--mono); font-size: 11px; }
+
+  .swatch-dot {
+    width: 14px; height: 14px;
+    border-radius: 4px;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+
+  /* ---- Export ---- */
+  .export-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+  .export-tab {
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: var(--sans);
+  }
+  .export-tab.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .export-box {
+    position: relative;
+  }
+
+  pre.export-code {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.6;
+    overflow-x: auto;
+    color: var(--text-primary);
+    margin: 0;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+
+  .export-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 6px;
+    z-index: 5;
+  }
+  .export-actions button {
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    color: var(--text-secondary);
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: all 0.15s ease;
+  }
+  .export-actions button:hover {
+    color: var(--text-primary);
+    background: var(--border);
+    border-color: var(--text-secondary);
+  }
+
+  .output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 32px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .output-header h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .palette-quick-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .palette-quick-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .palette-quick-actions button:hover {
+    background: var(--bg);
+    border-color: var(--text-secondary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  }
+
+  .palette-quick-actions button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .palette-quick-actions button svg {
+    flex-shrink: 0;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-tertiary);
+    font-size: 13px;
+  }
+
+  .accessibility-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    margin-top: 8px;
+    color: var(--text-secondary);
+  }
+  .a11y-pass { color: #5A8A3A; }
+  .a11y-fail { color: #B8533F; }
+  .a11y-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid currentColor;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Palette forge</h1>
+    <p class="subtitle">Give it 1 or more brand colors. It builds perceptually-even OKLCH ramps, semantic tokens, and exportable code — entirely in your browser, nothing leaves the device.</p>
+  </header>
+
+  <div class="input-panel">
+    <div class="input-row" id="colorInputs"></div>
+    <button class="add-color-btn" id="addColorBtn">+ add color</button>
+
+    <div class="controls-row">
+      <div class="options">
+        <label><input type="checkbox" id="autoSemantic" checked> auto-generate semantic colors (success/warning/error/info)</label>
+        <label><input type="checkbox" id="darkPreview"> preview dark mode swap</label>
+      </div>
+      <button class="generate-btn" id="generateBtn">Generate palette</button>
+    </div>
+  </div>
+
+  <div id="output"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/culori@4/bundled/culori.min.js"></script>
+<script>
+/* ============================================================
+   PALETTE FORGE — OKLCH-based perceptual ramp generator
+   All color math via culori (loaded from CDN, works fully
+   offline once cached by the browser).
+   ============================================================ */
+
+const { converter, formatHex, clampChroma, parse } = culori;
+const toOklch = converter('oklch');
+const toRgb = converter('rgb');
+
+/* ---------- Lightness curve for the 8-step ramp ----------
+   Steps: 50, 100, 200, 300, 500, 600, 800, 900
+   These L values are tuned so the ramp feels like a standard
+   Tailwind/Radix-style scale but generated perceptually rather
+   than via naive HSL interpolation (which produces muddy mids
+   and inconsistent perceived contrast steps). */
+const RAMP_STEPS = [50, 100, 200, 300, 500, 600, 800, 900];
+const LIGHTNESS_CURVE = {
+  50:  0.97,
+  100: 0.93,
+  200: 0.85,
+  300: 0.74,
+  500: 0.58,
+  600: 0.48,
+  800: 0.30,
+  900: 0.19
+};
+
+/* Chroma tapering: at very light and very dark steps, max
+   sustainable chroma drops (this is what prevents neon-bright
+   50-steps or muddy/clipped 900-steps). Expressed as a multiplier
+   on the base chroma extracted from the input color. */
+const CHROMA_CURVE = {
+  50:  0.18,
+  100: 0.32,
+  200: 0.55,
+  300: 0.78,
+  500: 1.0,
+  600: 0.96,
+  800: 0.70,
+  900: 0.45
+};
+
+function hexToOklch(hex) {
+  const c = toOklch(parse(hex));
+  // Hue is numerically unstable (near-random) when chroma is close to
+  // zero — meaningless for true grays/near-black/near-white. Below this
+  // threshold, return undefined so callers use a deliberate fallback
+  // instead of visual noise.
+  const CHROMA_NOISE_FLOOR = 0.01;
+  const stableHue = (c.c || 0) > CHROMA_NOISE_FLOOR ? c.h : undefined;
+  return { l: c.l, c: c.c || 0, h: stableHue };
+}
+
+function oklchToHex(l, c, h) {
+  const color = clampChroma({ mode: 'oklch', l, c, h }, 'oklch');
+  return formatHex(color);
+}
+
+/* Generate an 8-step ramp from a base color's hue, anchored so
+   that the step closest to the base color's own lightness uses
+   the base color's actual chroma (preserving the "this still
+   looks like my color" property), then tapers outward. */
+function generateRamp(baseHex, hueShift = 0) {
+  const base = hexToOklch(baseHex);
+  const baseChroma = Math.max(base.c, 0.02); // floor so near-gray inputs still produce a visible ramp
+  const hue = ((base.h !== undefined ? base.h : 90) + hueShift + 360) % 360;
+
+  const ramp = {};
+  RAMP_STEPS.forEach(step => {
+    const l = LIGHTNESS_CURVE[step];
+    const c = baseChroma * CHROMA_CURVE[step];
+    ramp[step] = oklchToHex(l, c, hue);
+  });
+  return ramp;
+}
+
+/* Build a neutral ramp: same hue as a reference color (so grays
+   carry a subtle warm/cool tint matching the brand) but heavily
+   reduced chroma throughout. */
+function generateNeutralRamp(referenceHex) {
+  const ref = hexToOklch(referenceHex);
+  const hue = ref.h !== undefined ? ref.h : 90; // fallback hue if reference is achromatic
+  const ramp = {};
+  RAMP_STEPS.forEach(step => {
+    const l = LIGHTNESS_CURVE[step];
+    // Neutral chroma stays very low and roughly flat — just enough
+    // to read as "tinted gray" rather than pure gray, peaking
+    // slightly in midtones where tint is most visible.
+    const c = 0.012 + (CHROMA_CURVE[step] * 0.012);
+    ramp[step] = oklchToHex(l, c, hue);
+  });
+  return ramp;
+}
+
+/* Semantic colors: rotate hue toward the canonical zone for each
+   meaning, but match the chroma/lightness "character" (saturation
+   intensity) of the input palette so they feel native rather than
+   stock Material colors dropped in. */
+const SEMANTIC_HUES = {
+  success: 142,   // green
+  warning: 75,    // amber/yellow
+  error:   25,    // red/coral
+  info:    230     // blue
+};
+
+function generateSemanticRamp(hue, characterChroma) {
+  const ramp = {};
+  RAMP_STEPS.forEach(step => {
+    const l = LIGHTNESS_CURVE[step];
+    const c = characterChroma * CHROMA_CURVE[step];
+    ramp[step] = oklchToHex(l, c, hue);
+  });
+  return ramp;
+}
+
+/* ---------- Contrast checking (WCAG) ---------- */
+function relativeLuminance(hex) {
+  const rgb = toRgb(parse(hex));
+  const lin = v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  return 0.2126 * lin(rgb.r) + 0.7152 * lin(rgb.g) + 0.0722 * lin(rgb.b);
+}
+function contrastRatio(hex1, hex2) {
+  const l1 = relativeLuminance(hex1);
+  const l2 = relativeLuminance(hex2);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/* ============================================================
+   UI STATE & RENDERING
+   ============================================================ */
+
+let colors = [
+  { hex: '#484A36', role: 'primary' },
+  { hex: '#F4F1EC', role: 'neutral base' }
+];
+
+const palette = {
+  type: ['default', 'photo', 'illustration', 'cinema'],
+  colorInputsEl: document.getElementById('colorInputs'),
+  outputEl: document.getElementById('output')
+};
+
+function renderColorInputs() {
+  palette.colorInputsEl.innerHTML = '';
+  colors.forEach((c, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'color-chip';
+    chip.innerHTML = `
+      <span class="role-label">${i === 0 ? 'primary' : i === 1 ? 'neutral' : 'accent ' + (i - 1)}</span>
+      <input type="color" value="${c.hex}" data-idx="${i}">
+      <input type="text" value="${c.hex}" data-idx="${i}" maxlength="7">
+      ${colors.length > 1 ? `<button class="remove-btn" data-idx="${i}">×</button>` : ''}
+    `;
+    palette.colorInputsEl.appendChild(chip);
+  });
+
+  palette.colorInputsEl.querySelectorAll('input[type="color"]').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const idx = +e.target.dataset.idx;
+      colors[idx].hex = e.target.value;
+      palette.colorInputsEl.querySelector(`input[type="text"][data-idx="${idx}"]`).value = e.target.value;
+    });
+  });
+  palette.colorInputsEl.querySelectorAll('input[type="text"]').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const idx = +e.target.dataset.idx;
+      let v = e.target.value.trim();
+      if (!v.startsWith('#')) v = '#' + v;
+      try {
+        parse(v);
+        colors[idx].hex = v;
+        palette.colorInputsEl.querySelector(`input[type="color"][data-idx="${idx}"]`).value = v;
+      } catch (err) {
+        e.target.value = colors[idx].hex; // revert on invalid
+      }
+    });
+  });
+  palette.colorInputsEl.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const idx = +e.target.dataset.idx;
+      colors.splice(idx, 1);
+      renderColorInputs();
+    });
+  });
+}
+
+document.getElementById('addColorBtn').addEventListener('click', () => {
+  colors.push({ hex: '#9A8C78', role: 'accent' });
+  renderColorInputs();
+});
+
+document.getElementById('generateBtn').addEventListener('click', generate);
+document.getElementById('darkPreview').addEventListener('change', generate);
+document.getElementById('autoSemantic').addEventListener('change', generate);
+
+function copyToClipboard(text, el) {
+  navigator.clipboard.writeText(text).then(() => {
+    if (el) {
+      el.classList.add('copied');
+      setTimeout(() => el.classList.remove('copied'), 900);
+    }
+  });
+}
+
+function renderRamp(title, sub, ramp) {
+  const section = document.createElement('div');
+  section.className = 'section';
+  section.innerHTML = `
+    <div class="section-title">${title}</div>
+    <div class="section-sub">${sub}</div>
+    <div class="ramp"></div>
+  `;
+  const rampEl = section.querySelector('.ramp');
+  RAMP_STEPS.forEach(step => {
+    const hex = ramp[step];
+    const lum = relativeLuminance(hex);
+    const textColor = lum > 0.4 ? '#222' : '#fff';
+    const sw = document.createElement('div');
+    sw.className = 'swatch';
+    sw.style.background = hex;
+    sw.style.color = textColor;
+    sw.innerHTML = `<span class="step">${step}</span><span class="hex">${hex.toUpperCase()}</span>`;
+    sw.addEventListener('click', () => copyToClipboard(hex, sw));
+    rampEl.appendChild(sw);
+  });
+  return section;
+}
+
+/* ---------- Semantic token mapping ----------
+   Dark mode is NOT a different palette — it's the same ramps,
+   read at different steps. A token like text/primary points at
+   neutral-900 in light mode (near-black text) and flips to
+   neutral-50 in dark mode (near-white text), using the exact
+   same ramp. background/primary does the inverse swap. This is
+   why generating new ramps for dark mode would be wrong: the
+   ramps are already complete, only the *mapping* changes. */
+const TOKEN_MAP = [
+  { token: 'background/primary',       ramp: 'neutral', light: 50,  dark: 900, usage: 'App background / page canvas' },
+  { token: 'background/surface',       ramp: 'neutral', light: 0,   dark: 800, usage: 'Cards, sheets, modals (0 = pure white in light mode)' },
+  { token: 'border/default',           ramp: 'neutral', light: 200, dark: 600, usage: 'Dividers, input borders' },
+  { token: 'border/strong',            ramp: 'neutral', light: 300, dark: 500, usage: 'Focus rings, emphasized borders' },
+  { token: 'text/primary',             ramp: 'neutral', light: 900, dark: 50,  usage: 'Headings, body text' },
+  { token: 'text/secondary',           ramp: 'neutral', light: 600, dark: 200, usage: 'Captions, placeholders' },
+  { token: 'text/tertiary',            ramp: 'neutral', light: 300, dark: 300, usage: 'Disabled, hints (mid-ramp works in both modes)' },
+  { token: 'action/primary',           ramp: 'primary', light: 600, dark: 300, usage: 'Primary buttons, active states' },
+  { token: 'action/primary-hover',     ramp: 'primary', light: 500, dark: 200, usage: 'Hover/pressed states' },
+  { token: 'action/primary-subtle',    ramp: 'primary', light: 100, dark: 800, usage: 'Selected chip bg, tinted icon bg' }
+];
+
+/* Pulls the right hex out of the right ramp for a given mode.
+   step=0 is a special case meaning "pure white/black", since
+   that's a common need (true white cards) that no ramp step
+   represents exactly. */
+function resolveToken(entry, mode, ramps) {
+  const step = entry[mode];
+  if (step === 0) return mode === 'light' ? '#FFFFFF' : '#000000';
+  const ramp = ramps[entry.ramp];
+  return ramp[step];
+}
+
+function buildTokens(primaryRamp, neutralRamp, semanticRamps, mode) {
+  const ramps = { primary: primaryRamp, neutral: neutralRamp };
+  const base = TOKEN_MAP.map(entry => ({
+    token: entry.token,
+    hex: resolveToken(entry, mode, ramps),
+    usage: entry.usage
+  }));
+  const semantic = semanticRamps ? Object.keys(semanticRamps).map(key => ({
+    token: `feedback/${key}`,
+    // Semantic feedback colors read from a lighter step in dark mode
+    // (300 vs 500) for the same reason action/primary does — a fully
+    // saturated 500-step color tends to glow uncomfortably on a dark
+    // background, where lighter/brighter steps read as more natural.
+    hex: semanticRamps[key][mode === 'light' ? 500 : 300],
+    usage: `${key.charAt(0).toUpperCase() + key.slice(1)} states, badges, alerts`
+  })) : [];
+  return [...base, ...semantic];
+}
+
+function renderTokenTable(tokens, modeLabel) {
+  const section = document.createElement('div');
+  section.className = 'section';
+  section.innerHTML = `
+    <div class="section-title">Semantic tokens${modeLabel ? ` — ${modeLabel}` : ''}</div>
+    <div class="section-sub">What your components should actually reference — never raw ramp values directly.</div>
+  `;
+  const table = document.createElement('table');
+  table.className = 'token-table';
+  table.innerHTML = `
+    <tr><th>Token</th><th>Value</th><th>Usage</th></tr>
+    ${tokens.map(t => `
+      <tr>
+        <td><code>${t.token}</code></td>
+        <td><span class="swatch-dot" style="background:${t.hex}"></span><code>${t.hex.toUpperCase()}</code></td>
+        <td>${t.usage}</td>
+      </tr>
+    `).join('')}
+  `;
+  section.appendChild(table);
+  return section;
+}
+
+function renderAccessibilityCheck(neutralRamp, primaryRamp) {
+  const section = document.createElement('div');
+  section.className = 'section';
+  section.innerHTML = `<div class="section-title">Contrast check</div><div class="section-sub">WCAG AA requires 4.5:1 for body text, 3:1 for large text/UI components.</div>`;
+
+  const checks = [
+    { label: 'text/primary on background/primary', fg: neutralRamp[900], bg: neutralRamp[50], min: 4.5 },
+    { label: 'text/secondary on background/primary', fg: neutralRamp[600], bg: neutralRamp[50], min: 4.5 },
+    { label: 'white text on action/primary button', fg: '#FFFFFF', bg: primaryRamp[600], min: 4.5 },
+    { label: 'action/primary on background/primary', fg: primaryRamp[600], bg: neutralRamp[50], min: 3.0 }
+  ];
+
+  checks.forEach(chk => {
+    const ratio = contrastRatio(chk.fg, chk.bg);
+    const pass = ratio >= chk.min;
+    const row = document.createElement('div');
+    row.className = 'accessibility-row';
+    row.innerHTML = `
+      <span class="swatch-dot" style="background:${chk.bg}"></span>
+      <span class="swatch-dot" style="background:${chk.fg}"></span>
+      ${chk.label} — ${ratio.toFixed(2)}:1
+      <span class="a11y-badge ${pass ? 'a11y-pass' : 'a11y-fail'}">${pass ? 'PASS' : 'FAIL'}</span>
+    `;
+    section.appendChild(row);
+  });
+  return section;
+}
+
+/* ---------- Export code generation ---------- */
+function generateCSSExport(primaryRamp, neutralRamp, semanticRamps, lightTokens, darkTokens) {
+  let css = ':root {\n  /* Primitives — primary ramp */\n';
+  RAMP_STEPS.forEach(s => css += `  --primary-${s}: ${primaryRamp[s]};\n`);
+  css += '\n  /* Primitives — neutral ramp */\n';
+  RAMP_STEPS.forEach(s => css += `  --neutral-${s}: ${neutralRamp[s]};\n`);
+  if (semanticRamps) {
+    Object.keys(semanticRamps).forEach(key => {
+      css += `\n  /* Primitives — ${key} ramp */\n`;
+      RAMP_STEPS.forEach(s => css += `  --${key}-${s}: ${semanticRamps[key][s]};\n`);
+    });
+  }
+  css += '\n  /* Semantic tokens — light mode (default) */\n';
+  lightTokens.forEach(t => {
+    css += `  --${t.token.replace('/', '-')}: ${t.hex};\n`;
+  });
+  css += '}\n';
+
+  if (darkTokens) {
+    css += `\n/* Dark mode — same primitives above, semantic tokens repointed.\n   Swap the selector below to [data-theme="dark"] if you prefer\n   manual toggling over following the OS setting. */\n`;
+    css += '@media (prefers-color-scheme: dark) {\n  :root {\n';
+    darkTokens.forEach(t => {
+      css += `    --${t.token.replace('/', '-')}: ${t.hex};\n`;
+    });
+    css += '  }\n}\n';
+  }
+  return css;
+}
+
+function generateTailwindExport(primaryRamp, neutralRamp, semanticRamps) {
+  const fmt = (ramp) => RAMP_STEPS.map(s => `          ${s}: '${ramp[s]}',`).join('\n');
+  let js = `// tailwind.config.js\nmodule.exports = {\n  theme: {\n    extend: {\n      colors: {\n        primary: {\n${fmt(primaryRamp)}\n        },\n        neutral: {\n${fmt(neutralRamp)}\n        },\n`;
+  if (semanticRamps) {
+    Object.keys(semanticRamps).forEach(key => {
+      js += `        ${key}: {\n${fmt(semanticRamps[key])}\n        },\n`;
+    });
+  }
+  js += `      }\n    }\n  }\n}\n`;
+  return js;
+}
+
+function generateFigmaJSON(primaryRamp, neutralRamp, semanticRamps, lightTokens, darkTokens) {
+  const obj = { primitives: { primary: primaryRamp, neutral: neutralRamp }, semantic: { light: {}, dark: {} } };
+  if (semanticRamps) obj.primitives = { ...obj.primitives, ...semanticRamps };
+  lightTokens.forEach(t => { obj.semantic.light[t.token] = t.hex; });
+  if (darkTokens) {
+    darkTokens.forEach(t => { obj.semantic.dark[t.token] = t.hex; });
+  } else {
+    delete obj.semantic.dark;
+  }
+  return JSON.stringify(obj, null, 2);
+}
+
+function generateSwiftExport(tokens) {
+  let swift = '// Light mode tokens. For dark mode, define a second set in an\n// Asset Catalog color set with both Any/Dark appearances, or add\n// a parallel "AppColorsDark" struct and switch on colorScheme.\nimport SwiftUI\n\nextension Color {\n';
+  tokens.forEach(t => {
+    const name = t.token.replace('/', '_').replace(/-./g, m => m[1].toUpperCase());
+    swift += `    static let ${name} = Color(hex: "${t.hex}")\n`;
+  });
+  swift += '}\n';
+  return swift;
+}
+
+function generateKotlinExport(tokens) {
+  let kt = '// Light mode tokens. For dark mode, wrap these in MaterialTheme\n// colorScheme and provide a second AppColorsDark object, switched\n// via isSystemInDarkTheme().\nimport androidx.compose.ui.graphics.Color\n\nobject AppColors {\n';
+  tokens.forEach(t => {
+    const name = t.token.replace('/', '_').replace(/-./g, m => m[1].toUpperCase());
+    kt += `    val ${name} = Color(0xFF${t.hex.replace('#', '').toUpperCase()})\n`;
+  });
+  kt += '}\n';
+  return kt;
+}
+
+function renderExportPanel(primaryRamp, neutralRamp, semanticRamps, lightTokens, darkTokens) {
+  const section = document.createElement('div');
+  section.className = 'section';
+  section.innerHTML = `<div class="section-title">Export</div><div class="section-sub">Copy directly into your codebase.${darkTokens ? ' CSS export includes a dark mode block automatically.' : ''}</div>`;
+
+  const exports = {
+    'CSS variables': generateCSSExport(primaryRamp, neutralRamp, semanticRamps, lightTokens, darkTokens),
+    'Tailwind config': generateTailwindExport(primaryRamp, neutralRamp, semanticRamps),
+    'Figma JSON': generateFigmaJSON(primaryRamp, neutralRamp, semanticRamps, lightTokens, darkTokens),
+    'SwiftUI': generateSwiftExport(lightTokens),
+    'Compose (Kotlin)': generateKotlinExport(lightTokens)
+  };
+
+  const tabsEl = document.createElement('div');
+  tabsEl.className = 'export-tabs';
+  const boxEl = document.createElement('div');
+  boxEl.className = 'export-box';
+
+  let activeTab = 'CSS variables';
+
+  function renderActive() {
+    tabsEl.innerHTML = '';
+    Object.keys(exports).forEach(name => {
+      const tab = document.createElement('button');
+      tab.className = 'export-tab' + (name === activeTab ? ' active' : '');
+      tab.textContent = name;
+      tab.addEventListener('click', () => { activeTab = name; renderActive(); });
+      tabsEl.appendChild(tab);
+    });
+    boxEl.innerHTML = `
+      <div class="export-actions">
+        <button class="copy-all-btn">copy</button>
+        <button class="download-btn">download</button>
+      </div>
+      <pre class="export-code">${escapeHtml(exports[activeTab])}</pre>
+    `;
+    boxEl.querySelector('.copy-all-btn').addEventListener('click', (e) => {
+      copyToClipboard(exports[activeTab]);
+      e.target.textContent = 'copied!';
+      setTimeout(() => e.target.textContent = 'copy', 900);
+    });
+    boxEl.querySelector('.download-btn').addEventListener('click', (e) => {
+      let ext = 'txt';
+      let mime = 'text/plain';
+      if (activeTab === 'CSS variables') { ext = 'css'; mime = 'text/css'; }
+      else if (activeTab === 'Tailwind config') { ext = 'js'; mime = 'application/javascript'; }
+      else if (activeTab === 'Figma JSON') { ext = 'json'; mime = 'application/json'; }
+      else if (activeTab === 'SwiftUI') { ext = 'swift'; mime = 'text/x-swift'; }
+      else if (activeTab === 'Compose (Kotlin)') { ext = 'kt'; mime = 'text/x-kotlin'; }
+      
+      downloadFile(exports[activeTab], `palette.${ext}`, mime);
+      e.target.textContent = 'downloaded!';
+      setTimeout(() => e.target.textContent = 'download', 900);
+    });
+  }
+  renderActive();
+
+  section.appendChild(tabsEl);
+  section.appendChild(boxEl);
+  return section;
+}
+
+function downloadFile(content, fileName, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function getPaletteJsonData(primaryRamp, neutralRamp, accentRamps, semanticRamps) {
+  const data = {
+    meta: {
+      generatedAt: new Date().toISOString(),
+      creator: "Palette Forge"
+    },
+    colors: {
+      primary: primaryRamp,
+      neutral: neutralRamp
+    }
+  };
+
+  if (accentRamps && accentRamps.length > 0) {
+    data.colors.accents = {};
+    accentRamps.forEach((r, idx) => {
+      data.colors.accents[`accent-${idx + 1}`] = r;
+    });
+  }
+
+  if (semanticRamps) {
+    data.colors.semantic = semanticRamps;
+  }
+
+  return JSON.stringify(data, null, 2);
+}
+
+function drawPaletteToCanvas(primaryRamp, neutralRamp, accentRamps, semanticRamps) {
+  const isDarkMode = document.getElementById('darkPreview').checked;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  const width = 1000;
+  const paddingX = 40;
+  const rampWidth = width - paddingX * 2; // 920
+
+  const rows = [];
+  const neutralRefHex = colors.length > 1 ? colors[1].hex : colors[0].hex;
+
+  rows.push({
+    title: '1. Neutral ramp',
+    subtitle: `Built around ${neutralRefHex.toUpperCase()} — grays feel tinted rather than generic.`,
+    data: neutralRamp
+  });
+  rows.push({
+    title: '2. Primary ramp',
+    subtitle: `Built from ${colors[0].hex.toUpperCase()} via OKLCH — lightness swept on a perceptual curve.`,
+    data: primaryRamp
+  });
+
+  if (accentRamps && accentRamps.length > 0) {
+    accentRamps.forEach((r, idx) => {
+      rows.push({
+        title: `${idx + 3}. Accent ramp ${idx + 1}`,
+        subtitle: `Built from ${colors[idx + 2].hex.toUpperCase()}.`,
+        data: r
+      });
+    });
+  }
+
+  if (semanticRamps) {
+    rows.push({
+      title: '3. Semantic accents',
+      subtitle: "Hue-rotated toward each meaning's canonical zone, but matched to your palette's chroma intensity.",
+      isHeaderOnly: true
+    });
+    rows.push({ title: 'Success', subtitle: '', data: semanticRamps.success, isSubRow: true });
+    rows.push({ title: 'Warning', subtitle: '', data: semanticRamps.warning, isSubRow: true });
+    rows.push({ title: 'Error', subtitle: '', data: semanticRamps.error, isSubRow: true });
+    rows.push({ title: 'Info', subtitle: '', data: semanticRamps.info, isSubRow: true });
+  }
+
+  // Calculate layout heights
+  let currentY = 40;
+  currentY += 45; // space for header
+
+  const layoutRows = rows.map(row => {
+    const startY = currentY;
+    if (row.isHeaderOnly) {
+      currentY += 24; // title
+      if (row.subtitle) currentY += 16; // subtitle
+      currentY += 12; // gap
+    } else {
+      if (row.isSubRow) {
+        currentY += 20; // smaller title
+      } else {
+        currentY += 22; // title
+        if (row.subtitle) currentY += 16; // subtitle
+      }
+      currentY += 8; // gap to ramp
+      currentY += 64; // ramp block height
+      currentY += 28; // gap below ramp
+    }
+    const endY = currentY;
+    return { ...row, startY, endY };
+  });
+
+  const height = currentY + 20; // bottom margin
+
+  // Configure high-DPI scaling
+  const scale = 2; // export at 2x for retina-crispness in Figma
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  ctx.scale(scale, scale);
+
+  // Background
+  const bgColor = isDarkMode ? '#1C1B17' : '#F4F1EC';
+  const textPrimaryColor = isDarkMode ? '#F1EFE8' : '#26251F';
+  const textSecondaryColor = isDarkMode ? '#B0AD9F' : '#6B695E';
+  const borderColor = isDarkMode ? '#3A3830' : '#E2DFD6';
+
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, width, height);
+
+  // Draw Header Title
+  ctx.fillStyle = textPrimaryColor;
+  ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+  ctx.fillText('Palette Forge', paddingX, 60);
+
+  ctx.fillStyle = textSecondaryColor;
+  ctx.font = '12px system-ui, -apple-system, sans-serif';
+  ctx.fillText('perceptual color ramp generator', paddingX + 135, 59);
+
+  // Draw rows
+  layoutRows.forEach(row => {
+    let y = row.startY;
+    if (row.isHeaderOnly) {
+      ctx.fillStyle = textPrimaryColor;
+      ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
+      ctx.fillText(row.title, paddingX, y + 14);
+      
+      if (row.subtitle) {
+        ctx.fillStyle = textSecondaryColor;
+        ctx.font = '11px system-ui, -apple-system, sans-serif';
+        ctx.fillText(row.subtitle, paddingX, y + 30);
+      }
+    } else {
+      if (row.isSubRow) {
+        ctx.fillStyle = textPrimaryColor;
+        ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+        ctx.fillText(row.title, paddingX, y + 12);
+        y += 20;
+      } else {
+        ctx.fillStyle = textPrimaryColor;
+        ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
+        ctx.fillText(row.title, paddingX, y + 14);
+        y += 22;
+
+        if (row.subtitle) {
+          ctx.fillStyle = textSecondaryColor;
+          ctx.font = '11px system-ui, -apple-system, sans-serif';
+          ctx.fillText(row.subtitle, paddingX, y);
+          y += 16;
+        }
+      }
+
+      y += 8; // gap to ramp
+
+      // Draw ramp
+      const swWidth = rampWidth / 8;
+      const swHeight = 64;
+      const radius = 12;
+
+      ctx.save();
+      // Draw rounded rectangle clip path
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(paddingX, y, rampWidth, swHeight, radius);
+      } else {
+        ctx.rect(paddingX, y, rampWidth, swHeight);
+      }
+      ctx.clip();
+
+      RAMP_STEPS.forEach((step, idx) => {
+        const hex = row.data[step];
+        const swX = paddingX + idx * swWidth;
+        
+        // Swatch background
+        ctx.fillStyle = hex;
+        ctx.fillRect(swX, y, swWidth, swHeight);
+
+        // Text colors
+        const lum = relativeLuminance(hex);
+        const textCol = lum > 0.4 ? '#222222' : '#FFFFFF';
+
+        // Draw Step
+        ctx.fillStyle = textCol;
+        ctx.font = 'bold 10px "SF Mono", Consolas, Menlo, monospace';
+        ctx.fillText(step.toString(), swX + 8, y + swHeight - 20);
+
+        // Draw Hex
+        ctx.fillStyle = textCol;
+        ctx.font = '10px "SF Mono", Consolas, Menlo, monospace';
+        ctx.fillText(hex.toUpperCase(), swX + 8, y + swHeight - 8);
+      });
+
+      ctx.restore();
+
+      // Draw ramp border
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(paddingX, y, rampWidth, swHeight, radius);
+      } else {
+        ctx.rect(paddingX, y, rampWidth, swHeight);
+      }
+      ctx.stroke();
+    }
+  });
+
+  return canvas;
+}
+
+function copyCanvasToClipboard(canvas, btn) {
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      console.error('Failed to generate canvas blob');
+      return;
+    }
+    const item = new ClipboardItem({ 'image/png': blob });
+    navigator.clipboard.write([item]).then(() => {
+      const origHTML = btn.innerHTML;
+      btn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        Copied Image!
+      `;
+      btn.style.borderColor = 'var(--accent)';
+      setTimeout(() => {
+        btn.innerHTML = origHTML;
+        btn.style.borderColor = '';
+      }, 1200);
+    }).catch(err => {
+      console.error('Clipboard write failed: ', err);
+      alert('Browser blocked copying images to clipboard. Please download the image or verify site permissions.');
+    });
+  }, 'image/png');
+}
+
+function downloadCanvasImage(canvas, fileName, btn) {
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    const origHTML = btn.innerHTML;
+    btn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      Downloaded!
+    `;
+    btn.style.borderColor = 'var(--accent)';
+    setTimeout(() => {
+      btn.innerHTML = origHTML;
+      btn.style.borderColor = '';
+    }, 1200);
+  }, 'image/png');
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/* ---------- Main generate function ---------- */
+function generate() {
+  palette.outputEl.innerHTML = '';
+
+  if (colors.length === 0) return;
+
+  const primaryHex = colors[0].hex;
+  const neutralRefHex = colors.length > 1 ? colors[1].hex : colors[0].hex;
+
+  const primaryRamp = generateRamp(primaryHex);
+  const neutralRamp = generateNeutralRamp(neutralRefHex);
+
+  // Output header with copy and download actions
+  const headerEl = document.createElement('div');
+  headerEl.className = 'output-header';
+  headerEl.innerHTML = `
+    <h2>Generated Palette</h2>
+    <div class="palette-quick-actions">
+      <button id="copyPaletteBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        Copy Palette Image
+      </button>
+      <button id="downloadPaletteBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Download Palette Image
+      </button>
+    </div>
+  `;
+  palette.outputEl.appendChild(headerEl);
+
+  palette.outputEl.appendChild(
+    renderRamp('1. Neutral ramp', `Built around ${neutralRefHex.toUpperCase()} — every step carries the same subtle hue so the grays feel tinted rather than generic. Used for backgrounds, surfaces, borders, body text.`, neutralRamp)
+  );
+  palette.outputEl.appendChild(
+    renderRamp('2. Primary ramp', `Built from ${primaryHex.toUpperCase()} via OKLCH — hue held constant, lightness swept on a perceptual curve, chroma tapered at the extremes to avoid muddy darks or neon lights. 500–600 is your default "use this for buttons" zone.`, primaryRamp)
+  );
+
+  let accentRamps = [];
+  if (colors.length > 2) {
+    for (let i = 2; i < colors.length; i++) {
+      const r = generateRamp(colors[i].hex);
+      accentRamps.push(r);
+      palette.outputEl.appendChild(
+        renderRamp(`${i + 1}. Accent ramp ${i - 1}`, `Built from ${colors[i].hex.toUpperCase()}.`, r)
+      );
+    }
+  }
+
+  let semanticRamps = null;
+  const autoSemantic = document.getElementById('autoSemantic').checked;
+  if (autoSemantic) {
+    const character = hexToOklch(primaryHex).c || 0.08;
+    semanticRamps = {};
+    Object.keys(SEMANTIC_HUES).forEach(key => {
+      semanticRamps[key] = generateSemanticRamp(SEMANTIC_HUES[key], Math.max(character, 0.12));
+    });
+
+    const semSection = document.createElement('div');
+    semSection.className = 'section';
+    semSection.innerHTML = `<div class="section-title">3. Semantic accents</div><div class="section-sub">Hue-rotated toward each meaning's canonical zone, but matched to your palette's chroma intensity so they feel native rather than stock.</div>`;
+    Object.keys(semanticRamps).forEach(key => {
+      semSection.appendChild(renderRamp(key.charAt(0).toUpperCase() + key.slice(1), '', semanticRamps[key]));
+    });
+    palette.outputEl.appendChild(semSection);
+  }
+
+  const lightTokens = buildTokens(primaryRamp, neutralRamp, semanticRamps, 'light');
+  palette.outputEl.appendChild(renderTokenTable(lightTokens, 'light mode'));
+  palette.outputEl.appendChild(renderModePreview(lightTokens, 'light'));
+
+  const darkPreviewOn = document.getElementById('darkPreview').checked;
+  let darkTokens = null;
+  if (darkPreviewOn) {
+    darkTokens = buildTokens(primaryRamp, neutralRamp, semanticRamps, 'dark');
+    palette.outputEl.appendChild(renderTokenTable(darkTokens, 'dark mode'));
+    palette.outputEl.appendChild(renderModePreview(darkTokens, 'dark'));
+  }
+
+  palette.outputEl.appendChild(renderAccessibilityCheck(neutralRamp, primaryRamp));
+  palette.outputEl.appendChild(renderExportPanel(primaryRamp, neutralRamp, semanticRamps, lightTokens, darkTokens));
+
+  // Bind actions for output header buttons
+  headerEl.querySelector('#copyPaletteBtn').addEventListener('click', (e) => {
+    const canvas = drawPaletteToCanvas(primaryRamp, neutralRamp, accentRamps, semanticRamps);
+    copyCanvasToClipboard(canvas, e.currentTarget);
+  });
+
+  headerEl.querySelector('#downloadPaletteBtn').addEventListener('click', (e) => {
+    const canvas = drawPaletteToCanvas(primaryRamp, neutralRamp, accentRamps, semanticRamps);
+    downloadCanvasImage(canvas, 'palette.png', e.currentTarget);
+  });
+}
+
+/* Renders a small mock UI card (heading, body text, button) styled
+   entirely from the token list, so dark mode isn't just a table of
+   hex codes — you can actually see whether it holds together. */
+function renderModePreview(tokens, mode) {
+  const get = (name) => tokens.find(t => t.token === name)?.hex || '#888888';
+  const section = document.createElement('div');
+  section.className = 'section';
+  section.innerHTML = `<div class="section-title">Live preview — ${mode} mode</div>`;
+
+  const card = document.createElement('div');
+  card.style.cssText = `
+    background:${get('background/primary')};
+    border:1px solid ${get('border/default')};
+    border-radius:14px;
+    padding:24px;
+  `;
+  card.innerHTML = `
+    <div style="background:${get('background/surface')};border:1px solid ${get('border/default')};border-radius:10px;padding:18px;max-width:360px;">
+      <div style="color:${get('text/primary')};font-size:15px;font-weight:600;margin-bottom:4px;">Card heading</div>
+      <div style="color:${get('text/secondary')};font-size:13px;margin-bottom:14px;">Secondary text sits here, used for captions and supporting copy.</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="background:${get('action/primary')};color:${get('background/primary')};font-size:12px;font-weight:500;padding:8px 14px;border-radius:8px;">Primary action</span>
+        <span style="background:${get('action/primary-subtle')};color:${get('action/primary')};font-size:12px;font-weight:500;padding:8px 14px;border-radius:8px;">Subtle</span>
+      </div>
+    </div>
+  `;
+  section.appendChild(card);
+  return section;
+}
+
+/* ---------- Init ---------- */
+renderColorInputs();
+generate();
+</script>
+</body>
+</html>
