@@ -1073,7 +1073,7 @@ function drawPaletteToCanvas(primaryRamp, neutralRamp, accentRamps, semanticRamp
         if (row.subtitle) {
           ctx.fillStyle = textSecondaryColor;
           ctx.font = '11px system-ui, -apple-system, sans-serif';
-          ctx.fillText(row.subtitle, paddingX, y);
+          ctx.fillText(row.subtitle, paddingX, y + 11);
           y += 16;
         }
       }
